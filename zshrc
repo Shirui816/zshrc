@@ -1,7 +1,6 @@
 # Created by newuser for 5.0.2
 
-bindkey    "^[[3~"          delete-char
-bindkey    "^[3;5~"         delete-char
+eval "$(sed -n 's/^/bindkey /; s/: / /p' /etc/inputrc)"
 autoload colors && colors
 alias ls='ls --color=auto -F'
 alias fcfb='fcitx-fbterm-helper -l'
