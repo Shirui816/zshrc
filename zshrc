@@ -21,7 +21,7 @@ setopt AUTO_PUSHD
 setopt PUSHD_IGNORE_DUPS
 setopt AUTO_LIST
 setopt AUTO_MENU
-alias sproxy="sshuttle -r shirui@511office 0.0.0.0/0 -vv -D"
+
 
 zstyle ':completion:*:processes-names' command 'ps c -u ${USER} -o command | uniq'
 zstyle ':completion:*' verbose yes
