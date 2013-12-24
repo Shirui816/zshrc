@@ -1,6 +1,10 @@
 # Created by newuser for 5.0.2
 
 eval "$(sed -n 's/^/bindkey /; s/: / /p' /etc/inputrc)"
+source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.plugin.zsh
+autoload -U promptinit
+promptinit
+export LC_ALL="zh_CN.UTF8"
 autoload colors && colors
 alias ls='ls --color=auto -F'
 alias fcfb='fcitx-fbterm-helper -l'
@@ -17,7 +21,9 @@ setopt AUTO_PUSHD
 setopt PUSHD_IGNORE_DUPS
 setopt AUTO_LIST
 setopt AUTO_MENU
+alias sproxy="sshuttle -r shirui@511office 0.0.0.0/0 -vv -D"
 
+zstyle ':completion:*:processes-names' command 'ps c -u ${USER} -o command | uniq'
 zstyle ':completion:*' verbose yes
 zstyle ':completion:*' menu select
 zstyle ':completion:*:*:default' force-list always
@@ -48,7 +54,7 @@ compdef pkill=kill
 compdef pkill=killall
 zstyle ':completion:*:*:kill:*' menu yes select
 zstyle ':completion:*:*:*:*:processes' force-list always
-zstyle ':completion:*:processes' command 'ps -au$USER'
+zstyle ':completion:*:processes' command 'ps -au $USER'
 
 zstyle ':completion:*:matches' group 'yes'
 zstyle ':completion:*' group-name ''
@@ -60,9 +66,21 @@ zstyle ':completion:*:warnings' format $'\e[01;31m -- No Matches Found --\e[0m'
 zstyle ':completion:*:corrections' format $'\e[01;32m -- %d (errors: %e) --\e[0m'
 
 zstyle ':completion:*:-tilde-:*' group-order 'named-directories' 'path-directories' 'users' 'expand'
+setopt 'correct_all'
+autoload -U up-line-or-beginning-search
+autoload -U down-line-or-beginning-search
+zle -N up-line-or-beginning-search
+zle -N down-line-or-beginning-search
+bindkey '\eOA' up-line-or-beginning-search
+bindkey '\e[A' up-line-or-beginning-search
+bindkey '\eOB' down-line-or-beginning-search
+bindkey '\e[B' down-line-or-beginning-search
 
 
-PROMPT="%B(T_T)%b %{$fg_bold[green]%}%B%~%b"'${git_prompt}'" >>> "
+
+#RPROMPT="[%{$fg_no_bold[yellow]%}%?%{$reset_color%}]"
+export PATH=$PATH:~/.local/bin
+
 
 git_check_if_worktree() {
     if [ -n "${skip_zsh_git}" ]; then
@@ -106,7 +124,7 @@ git_branch() {
 
 git_dirty() {
     if [ "${git_worktree_is_bare}" = 'false' ] && [ -n "$(git status --untracked-files='no' --porcelain)" ]; then
-        git_dirty="%B%{$fg_bold[green]%}+%b"
+        git_dirty="%B%{$fg_bold[green]%}+%{$reset_color%}%b"
     else
         unset git_dirty
     fi
@@ -126,49 +144,32 @@ begin_with() {
 
 
 precmd() {
+    if [ "$(echo $?)" -eq 0 ]; then
+        ERR=0
+        unset error_prompt
+    else
+        ERR=1
+        error_prompt="%{$fg_bold[cyan]%}─%{$reset_color%}%{$fg_bold[red]%}(%{$reset_color%}%B✗%b%{$fg_bold[red]%})%{$reset_color%}" #{$fg_bold[cyan]%}─%{$reset_color%}
+    fi
+    file_prompt="%{$fg_bold[blue]%}(%{$reset_color%}%B$(ls -al | wc -l) files, $[ $(ls -al | wc -l) - $(ls -l | wc -l) ] hidden, $(ls -sh | head -n1 | awk '{print $2}')%{$fg_bold[blue]%})%{$reset_color%}"
     git_check_if_worktree
     if [ "${git_pwd_is_worktree}" = 'true' ]; then
         git_branch
         git_dirty
-        git_prompt=" %B%{$fg_bold[blue]%}[%b${git_branch}${git_dirty}%B%{$fg_bold[blue]%}]%b"
+        git_prompt="%{$fg_bold[cyan]%}─%{$reset_color%}%{$fg_bold[blue]%}(%{$reset_color%}%B${git_branch}${git_dirty}%b%{$fg_bold[blue]%})%{$reset_color%}"
     else
         unset git_prompt
     fi
+    PROMPT_PREV="%{$fg_bold[cyan]%}┌─%{$reset_color%}%B(@_@)%b${error_prompt}%{$fg_bold[cyan]%}─%{$reset_color%}%{$fg_bold[green]%}(%{$reset_color%}%B%~%b%{$fg_bold[green]%})%{$reset_color%}%{$fg_bold[cyan]%}─%{$reset_color%}${file_prompt}
+%{$fg_bold[cyan]%}└─%{$reset_color%}${git_prompt}%{$fg_bold[cyan]%}─%{$reset_color%}%{$fg_bold[red]%}>%{$reset_color%}%{$fg_bold[green]%}>%{$reset_color%}%{$fg_bold[blue]%}>%{$reset_color%} "
+    if [ "$(echo $ERR)" -eq 0 ]; then
+        PROMPT=$PROMPT_PREV
+        unset RPROMPT
+    else
+        RPROMPT="%{$fg_bold[red]%}(%?)%{$reset_color%}"
+        PROMPT="$PROMPT_PREV"
+    fi
+
 }
 
-recolor-cmd() {
-    region_highlight=()
-    colorize=true
-    start_pos=0
-    for arg in ${(z)BUFFER}; do
-        ((start_pos+=${#BUFFER[$start_pos+1,-1]}-${#${BUFFER[$start_pos+1,-1]## #}}))
-        ((end_pos=$start_pos+${#arg}))
-        if $colorize; then
-            colorize=false
-            res=$(LC_ALL=C builtin type $arg 2>/dev/null)
-            case $res in
-                *'reserved word'*)   style="fg=magenta,bold";;
-                *'alias for'*)       style="fg=cyan,bold";;
-                *'shell builtin'*)   style="fg=yellow,bold";;
-                *'shell function'*)  style='fg=green,bold';;
-                *"$arg is"*)
-                    [[ $arg = 'sudo' ]] && style="fg=red,bold" || style="fg=blue,bold";;
-                *)                   style='none,bold';;
-            esac
-            region_highlight+=("$start_pos $end_pos $style")
-        fi
-        [[ ${${TOKENS_FOLLOWED_BY_COMMANDS[(r)${arg//|/\|}]}:+yes} = 'yes' ]] && colorize=true
-        start_pos=$end_pos
-    done
-}
-
-check-cmd-self-insert() {
-    zle .self-insert && recolor-cmd
-}
-
-check-cmd-backward-delete-char() {
-    zle .backward-delete-char && recolor-cmd
-}
-
-zle -N self-insert check-cmd-self-insert
-zle -N backward-delete-char check-cmd-backward-delete-char
+# EOF
